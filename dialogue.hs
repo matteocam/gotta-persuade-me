@@ -1,3 +1,4 @@
+module Dialogue where
 
 -- Languages
 type LogicalLanguage = String
@@ -11,20 +12,27 @@ data CommunicationLanguage = Claim LL
 type CL = CommunicationLanguage
 type Id = Int
 
-data Player = P | O
 
+-- XXX: Hey! shouldn't agents have access to the dialogue too??
+class Player a where 
+  makeDialogueMove :: a -> Move
+
+data PlayerRole = P | O deriving (Show, Eq)
+
+otherPlayer P = O
+otherPlayer O = P
 
 -- Moves
-data Move = Move {id :: Id, 
+data Move  = Move {ident :: Id, 
                   s :: CL, -- speech act
-                  pl :: Player,
+                  pl :: PlayerRole,
                   t :: Id -- target
                   } deriving (Show, Eq)
             
 type Moves = [Move]
 lastMove :: Moves -> Move
 lastMove [] = error "Empty Move set"
-lastMove = head
+lastMove x = head x
 
 containsMove :: Move -> Moves -> Bool
 containsMove = elem
@@ -33,32 +41,68 @@ emptyMoves :: Moves -> Bool
 emptyMoves = null
 
 insertMove :: Move -> Moves -> Moves
-insertMove = : 
+insertMove = (:)
 
 -- Dialogue Systems
-data Dialogue = Dialogue {topic :: LL, moves :: Moves, turn :: Dialogue -> Player }
+data Player a => Dialogue a = Dialogue {topic :: LL,
+                            moves :: Moves,
+                            proponent :: a,
+                            opponent :: a}
 
-type TurnTakingFunction = Dialogue -> Player
+
+mkEmptyDialogue ::Player a => LL -> a -> a  -> Dialogue a
+mkEmptyDialogue t p o = Dialogue t [] p o
+
+
+type TurnTakingFunction a = Dialogue a -> PlayerRole
+
 
 -- alternateTurns
-simpleTurn :: TurnTakingFunction
-simpleTurn d = otherPlayer (pl $ lastMove $ moves d)
+simpleTurn :: Player a => TurnTakingFunction a
+simpleTurn d = if emptyMoves (moves d) then
+			          P
+				       else
+		            otherPlayer (pl $ lastMove $ moves d)
+
+-- function used for turnTaking
+turnTaker d = case simpleTurn d of
+                P -> proponent d
+                O -> opponent d
+
+
+type Outcome a = Dialogue a
+
+-- Outcome of a dialogue
+-- XXX: for now it is just the dialogue itself
+outcome :: Dialogue a -> Outcome a
+outcome = id
+
+terminated :: Player a => Dialogue a -> Bool
+terminated d = length (moves d) > 3 -- XXX
 
 -- a dialogue system takes into account things like turns or legal moves
 -- data DialogueSystem = DS {isLegalMove :: Move -> Bool, turn} 
 -- legalMoves :: DialogueSystem -> Moves -> Moves = 
 -- legalMoves ds = filter (isLegalMove ds)
-dialogue :: Player -> Player -> Outcome 
--- XXX: topic of the dialogue?
-dialogue p o = let dialogue' = undefined
-               in dialogue' emptyDialogue turnPlayer = turn dialogue
+
+dialogueProtocol' :: Player a => Dialogue a -> Outcome a
+-- XXX: topic of the dialogue
+dialogueProtocol' d = if terminated d then
+		                    outcome d
+	      		          else 
+                        dialogueProtocol' $ dialogueStep d (turnTaker d)
+
+                     
+dialogueProtocol :: (Player a) =>  LL -> a -> a -> Outcome a
+dialogueProtocol  t p o = dialogueProtocol' $ mkEmptyDialogue t p o
+               
 
 -- given a dialogue and a player that is supposed to move it returns another dialogue
 -- XXX: where should the check for legalMoves go?
 -- XXX: how much knowledge does the player have access to?
-dialogueStep :: Dialogue -> Player -> Dialogue 
-dialogueStep dialogue turnPlayer = let newMove = nextMove turnPlayer
-                                       moves' = insertMove newMove moves
+dialogueStep :: Player a =>  Dialogue a -> a -> Dialogue  a
+dialogueStep dialogue turnPlayer = let newMove = makeDialogueMove turnPlayer
+                                       moves' = insertMove newMove (moves dialogue)
                                    in dialogue { moves = moves'}
 
 
