@@ -1,0 +1,21 @@
+module Dialogue.Languages where
+-- Languages
+type LogicalLanguage = String
+type LL = LogicalLanguage 
+data CommunicationLanguage = Claim LL
+                             | Why LL
+                             | Since LL [LL] 
+                             | Concede LL 
+                             | Retract LL deriving (Show, Eq)
+                                                   
+type CL = CommunicationLanguage
+type Id = Int
+
+
+class Player a where 
+  makeDialogueMove :: Dialogue a -> a -> Move
+
+data PlayerRole = P | O deriving (Show, Eq)
+
+otherPlayer P = O
+otherPlayer O = P

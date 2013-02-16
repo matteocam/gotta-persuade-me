@@ -1,0 +1,11 @@
+module Dialogue.Commitments where
+
+import Dialogue.Languages
+
+type CommitmentStore = [LL]
+type CS = CommitmentStore
+
+emptyCS = undefined
+
+addCommitment :: LL -> CS -> CS
+addCommitment p cs = undefined 
